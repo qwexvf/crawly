@@ -14,17 +14,10 @@ jobs:
     name: Build and Test on OTP ${{ matrix.otp }} / Elixir ${{ matrix.elixir }}
     runs-on: ubuntu-latest
 
-    # Use a matrix to test against different Elixir/OTP versions
     strategy:
       matrix:
-        otp: ['26.2', '27.0'] # Test against latest OTP 26 and 27
-        elixir: ['1.16.3', '1.17.2'] # Test against latest Elixir 1.16 and 1.17
-        exclude:
-          # Exclude combinations that are not compatible
-          - otp: '26.2'
-            elixir: '1.17.2'
-          - otp: '27.0'
-            elixir: '1.16.3'
+        otp: ['27.0', '28.0']
+        elixir: ['1.18', '1.19']
 
     env:
       MIX_ENV: test
