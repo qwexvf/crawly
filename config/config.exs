@@ -11,7 +11,7 @@ config :crawly,
   start_http_api?: true,
   log_dir: "/tmp/spider_logs",
   log_to_file: true,
-  fetcher: {Crawly.Fetchers.HTTPoisonFetcher, []},
+  fetcher: {Crawly.Fetchers.ReqFetcher, []},
   retry: [
     retry_codes: [400],
     max_retries: 3,

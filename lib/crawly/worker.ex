@@ -44,7 +44,6 @@ defmodule Crawly.Worker do
 
         request ->
           # Process the request
-
           with {:ok, response} <- get_response({request, spider_name}),
                {:ok, parsed_item} <- parse_item(response),
                {:ok, :done} <- process_parsed_item(parsed_item) do
@@ -65,21 +64,18 @@ defmodule Crawly.Worker do
   end
 
   @doc false
+  # 1. Updated typespec to use a generic map() for the response
   @spec get_response({request, spider_name}) :: result
         when request: Crawly.Request.t(),
              spider_name: atom(),
-             response: HTTPoison.Response.t(),
-             result: {:ok, {response, spider_name}} | {:error, term()}
+             result: {:ok, {map(), spider_name}} | {:error, term()}
   def get_response({request, spider_name}) do
-    # check if spider-level fetcher is set. Overrides the globally configured fetcher.
-    # if not set, log warning for explicit config preferred,
-    # get the globally-configured fetcher. Defaults to HTTPoisonFetcher
-
+    # 2. The default fetcher is now ReqFetcher
     {fetcher, options} =
       Crawly.Utils.get_settings(
         :fetcher,
         spider_name,
-        {Crawly.Fetchers.HTTPoisonFetcher, []}
+        {Crawly.Fetchers.ReqFetcher, []}
       )
       |> Crawly.Utils.unwrap_module_and_options()
 
@@ -91,9 +87,8 @@ defmodule Crawly.Worker do
         :ok = maybe_retry_request(spider_name, request)
         err
 
-      {:ok, %HTTPoison.Response{status_code: code} = response} ->
-        # Send the request back to re-try in case if retry status code requires
-        # it.
+      # 3. Pattern match on the standardized map with :status_code
+      {:ok, %{status_code: code} = response} ->
         case code in retry_codes do
           true ->
             :ok = maybe_retry_request(spider_name, request)
@@ -106,16 +101,15 @@ defmodule Crawly.Worker do
   end
 
   @doc false
+  # 4. Updated typespec to use a generic map()
   @spec parse_item({response, spider_name}) :: result
-        when response: HTTPoison.Response.t(),
+        when response: map(),
              spider_name: atom(),
-             response: HTTPoison.Response.t(),
              parsed_item: Crawly.ParsedItem.t(),
-             next: {parsed_item, response, spider_name},
+             next: {parsed_item, map(), spider_name},
              result: {:ok, next} | {:error, term()}
   def parse_item({response, spider_name}) do
     try do
-      # get parsers
       parsers = Crawly.Utils.get_settings(:parsers, spider_name, nil)
       parsed_item = do_parse(parsers, spider_name, response)
 
@@ -136,6 +130,7 @@ defmodule Crawly.Worker do
     do: spider_name.parse_item(response)
 
   defp do_parse(parsers, spider_name, response) when is_list(parsers) do
+    # 5. Accessing response.request_url now works because our standardized map has it
     case Crawly.Utils.pipe(parsers, %{}, %{
            spider_name: spider_name,
            response: response
@@ -152,15 +147,16 @@ defmodule Crawly.Worker do
     end
   end
 
+  # 6. Updated typespec to use a generic map()
   @spec process_parsed_item({parsed_item, response, spider_name}) :: result
         when spider_name: atom(),
-             response: HTTPoison.Response.t(),
+             response: map(),
              parsed_item: Crawly.ParsedItem.t(),
              result: {:ok, :done}
   defp process_parsed_item({parsed_item, response, spider_name}) do
     requests = Map.get(parsed_item, :requests) || []
     items = Map.get(parsed_item, :items) || []
-    # Process all requests one by one
+
     Enum.each(
       requests,
       fn request ->
@@ -169,13 +165,11 @@ defmodule Crawly.Worker do
       end
     )
 
-    # Process all items one by one
     Enum.each(items, &Crawly.DataStorage.store(spider_name, &1))
 
     {:ok, :done}
   end
 
-  ## Retry a request if max retries allows to do so
   defp maybe_retry_request(spider, request) do
     retries = request.retries
     retry_settings = Crawly.Utils.get_settings(:retry, spider, Keyword.new())

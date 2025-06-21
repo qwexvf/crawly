@@ -24,7 +24,7 @@ defmodule Crawly.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :sasl, :httpoison],
+      extra_applications: [:logger, :sasl],
       mod: {Crawly.Application, []}
     ]
   end
@@ -45,22 +45,21 @@ defmodule Crawly.Mixfile do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:httpoison, "~> 2.2"},
       {:elixir_uuid, "~> 1.2"},
-      {:poison, "~> 3.1"},
       {:gollum, "~> 0.5.0", hex: :new_gollum},
       {:plug_cowboy, "~> 2.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:earmark, "~> 1.2", only: :dev},
+      {:earmark, "1.5.0-pre1", override: true},
       {:meck, "~> 0.9", only: :test},
       {:excoveralls, "~> 0.14.6", only: :test},
-      {:yaml_elixir, "~> 2.9"},
-      {:ex_json_schema, "~> 0.9.2"},
+      {:yaml_elixir, "~> 2.11"},
+      {:ex_json_schema, "~> 0.11.1"},
       # Add floki only for crawly standalone release
       {:floki, "~> 0.33.0", only: [:dev, :test, :standalone_crawly]},
       {:logger_file_backend, "~> 0.0.11",
-       only: [:test, :dev, :standalone_crawly]}
+       only: [:test, :dev, :standalone_crawly]},
+      {:req, "~> 0.5.0"}
     ]
   end
 

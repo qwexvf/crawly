@@ -3,8 +3,8 @@ defmodule Crawly.Fetchers.CrawlyRenderServerTest do
 
   alias Crawly.Fetchers.CrawlyRenderServer
 
-  test "throws an error when base_url is not set" do
-    request = %{
+  test "raises an error when base_url is not set" do
+    request = %Crawly.Request{
       url: "https://example.com",
       headers: %{"User-Agent" => "Custom User Agent"}
     }
@@ -13,17 +13,20 @@ defmodule Crawly.Fetchers.CrawlyRenderServerTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        assert_raise RuntimeError, fn ->
-          CrawlyRenderServer.fetch(request, client_options)
-        end
+        # 1. The refactored code now raises a string, not a RuntimeError struct.
+        assert_raise "CrawlyRenderServer fetcher requires a :base_url option",
+                     fn ->
+                       CrawlyRenderServer.fetch(request, client_options)
+                     end
       end)
 
+    # 2. Assert against the new log message.
     assert log =~
-             "The base_url is not set. CrawlyRenderServer can't be used! Please set :base_url"
+             "The :base_url is not set. CrawlyRenderServer can't be used! Please set :base_url"
   end
 
   test "composes correct request to render server" do
-    request = %{
+    request = %Crawly.Request{
       url: "https://example.com",
       headers: [{"User-Agent", "Custom User Agent"}],
       options: []
@@ -31,13 +34,22 @@ defmodule Crawly.Fetchers.CrawlyRenderServerTest do
 
     client_options = [base_url: "http://localhost:3000"]
 
-    :meck.expect(HTTPoison, :post, fn base_url, body, headers, _options ->
-      assert headers == [{"content-type", "application/json"}]
+    # 3. Mock Req.post/2 instead of HTTPoison.post/5
+    :meck.expect(Req, :post, fn base_url, options ->
+      # 4. Extract headers and body from the options keyword list
+      headers = Keyword.get(options, :headers)
+      body = Keyword.get(options, :body)
+
+      # 5. Assert against Req's preferred data structures (map for headers)
+      assert headers == %{"content-type" => "application/json"}
       assert base_url == "http://localhost:3000"
 
-      body = Poison.decode!(body, %{keys: :atoms})
-      assert "https://example.com" == body.url
-      assert %{:"User-Agent" => "Custom User Agent"} == body.headers
+      decoded_body = JSON.decode!(body)
+      assert "https://example.com" == decoded_body["url"]
+      assert %{"User-Agent" => "Custom User Agent"} == decoded_body["headers"]
+
+      # Return a mock success tuple to satisfy the function call
+      {:ok, %Req.Response{status: 200, body: "{}"}}
     end)
 
     CrawlyRenderServer.fetch(request, client_options)

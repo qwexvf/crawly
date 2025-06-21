@@ -37,32 +37,6 @@ defmodule Crawly.Utils do
 
   @doc """
   Pipeline/Middleware helper
-
-  Executes a given list of pipelines on the given item, mimics filtermap behavior.
-  Takes an item and state and passes it through a list of modules which implements a pipeline behavior, executing the pipeline's `c:Crawly.Pipeline.run/3` function.
-
-  The pipe function must either return a boolean (`false`), or an updated item.
-
-  If `false` is returned by a pipeline, the item is dropped. It will not be processed by any descendant pipelines.
-
-  In case of a pipeline crash, the pipeline will be skipped and the item will be passed on to descendant pipelines.
-
-  The state variable is used to persist the information across multiple items.
-
-  ### Usage in Tests
-
-  The `Crawly.Utils.pipe/3` helper can be used in pipeline testing to simulate a set of middlewares/pipelines.
-
-  Internally, this function is used for both middlewares and pipelines. Hence, you can use it for testing modules that implement the `Crawly.Pipeline` behaviour.
-
-  For example, one can test that a given item is manipulated by a pipeline as so:
-  ```elixir
-  item = %{my: "item"}
-  state = %{}
-  pipelines = [ MyCustomPipelineOrMiddleware ]
-  {new_item, new_state} = Crawly.Utils.pipe(pipelines, item, state)
-
-  ```
   """
   @spec pipe(pipelines, item, state) :: result
         when pipelines: [Crawly.Pipeline.t()],
@@ -86,6 +60,8 @@ defmodule Crawly.Utils do
         module ->
           {module, nil}
       end
+
+    IO.puts("Running pipeline: #{inspect(module)}, with args: #{inspect(args)}")
 
     {new_item, new_state} =
       try do
@@ -111,13 +87,12 @@ defmodule Crawly.Utils do
           {item, state}
       end
 
+    IO.puts("Pipeline result: #{inspect(new_item)}")
     pipe(pipelines, new_item, new_state)
   end
 
   @doc """
   A wrapper over Process.send after
-  This wrapper should be used instead of Process.send_after, so it's possible
-  to mock the last one. To avoid race conditions on worker's testing.
   """
   @spec send_after(pid(), term(), pos_integer()) :: reference()
   def send_after(pid, message, timeout) do
@@ -126,22 +101,16 @@ defmodule Crawly.Utils do
 
   @doc """
   A helper which allows to extract a given setting.
-
-  Returned value is a result of intersection of the global settings and settings
-  defined as settings_override inside the spider. Settings defined on spider are
-  taking precedence over the global settings defined in the config.
   """
   @spec get_settings(setting_name, Crawly.spider(), default) :: result
         when setting_name: atom(),
              default: term(),
              result: term()
-
   def get_settings(setting_name, spider_name \\ nil, default \\ nil) do
     global_setting = Application.get_env(:crawly, setting_name, default)
 
     case get_spider_setting(setting_name, spider_name) do
       nil ->
-        # No custom settings for a spider found
         global_setting
 
       custom_setting ->
@@ -189,10 +158,8 @@ defmodule Crawly.Utils do
   end
 
   @doc """
-  Loads spiders from a given directory. Store thm in persistant term under :spiders
-
-  This allows to readup spiders stored in specific directory which is not a part
-  of Crawly application
+  Loads spiders from a given directory. Store them in persistant term under :spiders
+  ...
   """
   @spec load_spiders() :: {:ok, [module()]} | {:error, :no_spiders_dir}
   def load_spiders() do
@@ -207,7 +174,6 @@ defmodule Crawly.Utils do
         path = Path.join(dir, file)
         [{module, _binary}] = Code.compile_file(path)
 
-        # Use persistent term to store information about loaded spiders
         register_spider(module)
       end
     )
@@ -231,7 +197,7 @@ defmodule Crawly.Utils do
   def registered_spiders(), do: :persistent_term.get(@spider_storage_key, [])
 
   @doc """
-  Remove all previousely registered dynamic spiders
+  Remove all previously registered dynamic spiders
   """
   @spec clear_registered_spiders() :: :ok
   def clear_registered_spiders() do
@@ -240,15 +206,7 @@ defmodule Crawly.Utils do
 
   @doc """
   A helper function that is used by YML spiders
-
-  Extract requests from a given document using a given set of selectors
-  builds absolute_urls.
-
-  Selectors are aprovided as a JSON encoded list of maps, that contain
-  selector and attribute keys. E.g.
-  selectors = [%{"selector" => "a", "attribute" => "href"}]
-
-  Base URL is required to build absolute url from extracted links
+  ...
   """
   @spec extract_requests(document, selectors, base_url) :: requests
         when document: [Floki.html_node()],
@@ -256,7 +214,7 @@ defmodule Crawly.Utils do
              base_url: binary(),
              requests: [Crawly.Request.t()]
   def extract_requests(document, selectors, base_url) do
-    selectors = Poison.decode!(selectors)
+    selectors = JSON.decode!(selectors)
 
     Enum.reduce(
       selectors,
@@ -272,21 +230,14 @@ defmodule Crawly.Utils do
 
   @doc """
   A helper function that is used by YML spiders
-
-  Extract items (actually one item) from a given document using a
-  given set of selectors.
-
-  Selectors are aprovided as a JSON encoded list of maps, that contain
-  name and selector binary keys. For example:
-
-  field_selectors = [%{"selector" => "h1", "name" => "title"}]
+  ...
   """
   @spec extract_items(document, field_selectors) :: items
         when document: [Floki.html_node()],
              field_selectors: binary(),
              items: [map()]
   def extract_items(document, field_selectors) do
-    fields = Poison.decode!(field_selectors)
+    fields = JSON.decode!(field_selectors)
 
     item =
       Enum.reduce(
@@ -322,11 +273,10 @@ defmodule Crawly.Utils do
          "fields" => fields,
          "links_to_follow" => links
        }} ->
-        fields = Poison.encode!(fields)
-        links = Poison.encode!(links)
+        fields = JSON.encode!(fields)
+        links = JSON.encode!(links)
 
         Enum.map(
-          # Work only with 5 first URLs, so we don't timeout
           Enum.take(start_urls, 5),
           fn url ->
             fetch(url, base_url, fields, links)
@@ -339,7 +289,7 @@ defmodule Crawly.Utils do
   end
 
   defp fetch(url, base_url, fields, links) do
-    case HTTPoison.get(url) do
+    case Req.get(url) do
       {:error, reason} ->
         %{
           url: url,
@@ -353,7 +303,6 @@ defmodule Crawly.Utils do
           document
           |> Crawly.Utils.extract_requests(links, base_url)
           |> Enum.map(fn req -> req.url end)
-          # restrict number of shown urls, so output is not too big
           |> Enum.take(10)
 
         %{
@@ -365,21 +314,7 @@ defmodule Crawly.Utils do
   end
 
   @doc """
-    Composes the log file path for a given spider and crawl ID.
-
-    Args:
-    spider_name (atom): The name of the spider to create the log path for.
-    crawl_id (string): The ID of the crawl to create the log path for.
-
-    Returns:
-    string: The file path to the log file for the given spider and crawl ID.
-
-    Examples:
-    iex> spider_log_path(:my_spider, "crawl_123")
-    "/tmp/crawly/my_spider/crawl_123.log"
-
-    iex> spider_log_path(:my_spider, "crawl_456")
-    "/tmp/crawly/my_spider/crawl_456.log"
+  Composes the log file path for a given spider and crawl ID.
   """
   @spec spider_log_path(spider_name, crawl_id) :: path
         when spider_name: atom(),
@@ -406,13 +341,9 @@ defmodule Crawly.Utils do
     ]) <> ".log"
   end
 
-  ##############################################################################
-  # Private functions
-  ##############################################################################
   @spec get_spider_setting(Crawly.spider(), setting_name) :: result
         when setting_name: atom(),
              result: nil | term()
-
   defp get_spider_setting(_setting_name, nil), do: nil
 
   defp get_spider_setting(setting_name, spider_name) do
@@ -467,20 +398,6 @@ defmodule Crawly.Utils do
 
   @doc """
   Retrieves a header value from a list of key-value tuples or a map.
-
-  This function searches for a header with the specified key in the given list
-  of headers or map. If found, it returns the corresponding value; otherwise,
-  it returns the provided default value if provided, otherwise `nil`.
-
-  ## Parameters
-
-  - `headers`: A list of key-value tuples or a map representing headers.
-  - `key`: The key of the header to retrieve.
-  - `default`: (Optional) The default value to return if the header is not found. If not provided, returns `nil`.
-
-  ## Returns
-
-  The value of the header if found, otherwise the default value if provided, otherwise `nil`.
   """
   @spec get_header(
           headers :: [{atom | binary, binary}] | %{binary => binary},

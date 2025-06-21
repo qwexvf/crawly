@@ -30,7 +30,7 @@ defmodule Middlewares.SameDomainFilterTest do
 
     req = %Crawly.Request{
       url: "https://www.some_url.com",
-      prev_response: %HTTPoison.Response{request_url: @base_url}
+      prev_response: %{request_url: @base_url}
     }
 
     state = %{spider_name: :test_spider, crawl_id: "id"}
@@ -44,7 +44,8 @@ defmodule Middlewares.SameDomainFilterTest do
     req = %Crawly.Request{
       url:
         "https://www.erlang-solutions.com/blog/web-scraping-with-elixir.html",
-      prev_response: %HTTPoison.Response{request_url: @base_url}
+      # 2. Replaced Req.Response with a plain map for consistency
+      prev_response: %{request_url: @base_url}
     }
 
     state = %{spider_name: :test_spider, crawl_id: "id"}
@@ -59,7 +60,7 @@ defmodule Middlewares.SameDomainFilterTest do
     req = %Crawly.Request{
       url:
         "https://twitter.com?share=https://www.erlang-solutions.com/blog/web-scraping-with-elixir.html",
-      prev_response: %HTTPoison.Response{request_url: @base_url}
+      prev_response: %{request_url: @base_url}
     }
 
     state = %{spider_name: :test_spider, crawl_id: "id"}
@@ -72,7 +73,7 @@ defmodule Middlewares.SameDomainFilterTest do
 
     req = %Crawly.Request{
       url: "/blog",
-      prev_response: %HTTPoison.Response{request_url: @base_url}
+      prev_response: %{request_url: @base_url}
     }
 
     state = %{spider_name: :test_spider, crawl_id: "id"}

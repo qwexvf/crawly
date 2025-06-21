@@ -11,7 +11,7 @@ defmodule Middlewares.AutoCookiesManagertest do
   end
 
   test "Cookies are not added when there is no set cookie in prev response" do
-    prev_response = %HTTPoison.Response{
+    prev_response = %Req.Response{
       body: "test",
       headers: [
         {"Date", "Wed, 26 Feb 2020 21:06:52 GMT"},
@@ -34,7 +34,7 @@ defmodule Middlewares.AutoCookiesManagertest do
   end
 
   test "Cookies are taken into account" do
-    prev_response = %HTTPoison.Response{
+    prev_response = %Req.Response{
       body: "test",
       headers: [
         {"Set-Cookie", "bucket=desktop; Domain=.example.com; path=/;"},

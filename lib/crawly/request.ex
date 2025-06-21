@@ -4,9 +4,6 @@ defmodule Crawly.Request do
 
   Defines Crawly request structure.
   """
-  ### ===========================================================================
-  ### Type definitions
-  ### ===========================================================================
   defstruct url: nil,
             headers: [],
             prev_response: nil,
@@ -31,9 +28,6 @@ defmodule Crawly.Request do
           retries: non_neg_integer()
         }
 
-  ### ===========================================================================
-  ### API functions
-  ### ===========================================================================
   @doc """
   Create new Crawly.Request from url, headers and options
   """

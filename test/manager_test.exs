@@ -8,8 +8,10 @@ defmodule ManagerTest do
       Crawly.Request.new("http://example.com")
     end)
 
-    :meck.expect(Crawly.Fetchers.HTTPoisonFetcher, :fetch, fn _request, _opt ->
-      {:ok, %HTTPoison.Response{status_code: 200}}
+    # 1. Mock the new default fetcher: ReqFetcher
+    :meck.expect(Crawly.Fetchers.ReqFetcher, :fetch, fn _request, _opt ->
+      # 2. Return the standardized map that the worker expects
+      {:ok, %{status_code: 200}}
     end)
 
     on_exit(fn ->

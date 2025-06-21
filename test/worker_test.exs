@@ -97,23 +97,23 @@ defmodule WorkerTest do
     test "Pages with http 404 are handled correctly", context do
       test_pid = self()
 
+      # 1. Mock the fetcher, not the HTTP client
       :meck.expect(
-        HTTPoison,
-        :get,
-        fn _, _, _ ->
-          {
-            :ok,
-            %HTTPoison.Response{
-              status_code: 404,
-              body: "",
-              headers: [],
-              request: %{}
-            }
-          }
+        Crawly.Fetchers.ReqFetcher,
+        :fetch,
+        fn request, _options ->
+          # 2. Return the standardized map that the worker expects
+          {:ok,
+           %{
+             status_code: 404,
+             body: "",
+             headers: [],
+             request: request,
+             request_url: request.url
+           }}
         end
       )
 
-      # Mock the request storage, so we can see how request looks like
       :meck.expect(
         Crawly.RequestsStorage,
         :store,
@@ -123,16 +123,11 @@ defmodule WorkerTest do
         end
       )
 
-      # Start actual work
       send(context.crawler, :work)
 
       response = receive_mocked_response()
 
       assert response != false
-      assert response.retries == 1
-      Process.sleep(1000)
-      assert ExUnit.CaptureLog.capture_log(fn -> nil end)
-
       assert response.retries == 1
       assert Process.alive?(context.crawler)
     end
@@ -140,15 +135,15 @@ defmodule WorkerTest do
     test "Pages with http timeout are handled correctly", context do
       test_pid = self()
 
+      # 3. Mock the fetcher to return a Req error
       :meck.expect(
-        HTTPoison,
-        :get,
-        fn _, _, _ ->
-          {:error, %HTTPoison.Error{id: nil, reason: :timeout}}
+        Crawly.Fetchers.ReqFetcher,
+        :fetch,
+        fn _request, _options ->
+          {:error, %Req.TransportError{reason: :timeout}}
         end
       )
 
-      # Mock the request storage, so we can see how request looks like
       :meck.expect(
         Crawly.RequestsStorage,
         :store,
@@ -168,18 +163,17 @@ defmodule WorkerTest do
 
     test "Worker is not crashing when spider callback crashes", context do
       :meck.expect(
-        HTTPoison,
-        :get,
-        fn _, _, _ ->
-          {
-            :ok,
-            %HTTPoison.Response{
-              status_code: 200,
-              body: "Some page",
-              headers: [],
-              request: %{}
-            }
-          }
+        Crawly.Fetchers.ReqFetcher,
+        :fetch,
+        fn request, _options ->
+          {:ok,
+           %{
+             status_code: 200,
+             body: "Some page",
+             headers: [],
+             request: request,
+             request_url: request.url
+           }}
         end
       )
 
@@ -189,43 +183,36 @@ defmodule WorkerTest do
 
     test "Requests are dropped after 3 attempts", context do
       :meck.expect(
-        HTTPoison,
-        :get,
-        fn _, _, _ ->
-          {
-            :ok,
-            %HTTPoison.Response{
-              status_code: 500,
-              body: "Some page",
-              headers: [],
-              request: %{}
-            }
-          }
+        Crawly.Fetchers.ReqFetcher,
+        :fetch,
+        fn request, _options ->
+          {:ok,
+           %{
+             status_code: 500,
+             body: "Some page",
+             headers: [],
+             request: request,
+             request_url: request.url
+           }}
         end
       )
 
-      # Check if request is really dropped
       send(context.crawler, :work)
       send(context.crawler, :work)
       send(context.crawler, :work)
       send(context.crawler, :work)
 
-      # For now I don't see a good way of understanding when the worker
-      # have finished it's work. So have to do this ugly sleep
       Process.sleep(1000)
 
       {:stored_requests, num} =
         Crawly.DataStorage.Worker.stats(context.requests_storage)
 
       assert 0 == num
-
       assert Process.alive?(context.crawler)
     end
   end
 
   defp receive_mocked_response() do
-    # Check to see if request is added back to the request storage,
-    # and if the number of retries was incremented
     receive do
       {:request, req} ->
         req
@@ -247,19 +234,19 @@ defmodule WorkerTest do
         :ignore
       end)
 
+      # 4. Mock the fetcher here as well
       :meck.expect(
-        HTTPoison,
-        :get,
-        fn _, _, _ ->
-          {
-            :ok,
-            %HTTPoison.Response{
-              status_code: 200,
-              body: "Some page",
-              headers: [],
-              request: %{}
-            }
-          }
+        Crawly.Fetchers.ReqFetcher,
+        :fetch,
+        fn request, _options ->
+          {:ok,
+           %{
+             status_code: 200,
+             body: "Some page",
+             headers: [],
+             request: request,
+             request_url: request.url
+           }}
         end
       )
 
@@ -337,6 +324,7 @@ defmodule Worker.CrashingTestSpider do
 
   @impl Crawly.Spider
   def parse_item(_response) do
-    {[], []}
+    # This spider is designed to crash on purpose for a test case
+    raise "Spider crashed!"
   end
 end

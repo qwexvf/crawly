@@ -5,7 +5,7 @@ import Config
 config :logger, :console, truncate: :infinity
 
 config :crawly,
-  fetcher: {Crawly.Fetchers.HTTPoisonFetcher, []},
+  fetcher: {Crawly.Fetchers.ReqFetcher, []},
   retry: [
     retry_codes: [400],
     max_retries: 3,

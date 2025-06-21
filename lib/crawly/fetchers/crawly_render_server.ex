@@ -1,71 +1,82 @@
 defmodule Crawly.Fetchers.CrawlyRenderServer do
   @moduledoc """
   Implements Crawly.Fetchers.Fetcher behavior for Crawly Render Server
-  Javascript rendering.
+  JavaScript rendering using Req and built-in JSON.
 
-  Crawly Render Server is a lightweight puppeteer based Javascript rendering
-  engine server. Quite experimental. See more:
-  https://github.com/elixir-crawly/crawly-render-server
+  Crawly Render Server is a lightweight puppeteer based JavaScript rendering
+  engine server. See more: https://github.com/elixir-crawly/crawly-render-server
 
-  It exposes /render endpoint that renders JS on incoming requests. For example:
-  curl -X POST \
-    http://localhost:3000/render \
-    -H 'Content-Type: application/json' \
-    -d '{
-       "url": "https://example.com",
-       "headers": {"User-Agent": "Custom User Agent"}
-  }'
+  It exposes a /render endpoint that renders JS on incoming requests.
 
-  In this case you have to configure the fetcher in the following way:
+  To use this fetcher, configure it in your spider:
   `fetcher: {Crawly.Fetchers.CrawlyRenderServer, [base_url: "http://localhost:3000/render"]}`
   """
   @behaviour Crawly.Fetchers.Fetcher
 
   require Logger
 
+  @impl Crawly.Fetchers.Fetcher
   def fetch(request, client_options) do
     base_url =
-      case Keyword.get(client_options, :base_url, nil) do
+      case Keyword.get(client_options, :base_url) do
         nil ->
           Logger.error(
-            "The base_url is not set. CrawlyRenderServer can't be used! " <>
+            "The :base_url is not set. CrawlyRenderServer can't be used! " <>
               "Please set :base_url in fetcher options to continue. " <>
               "For example: " <>
               "fetcher: {Crawly.Fetchers.CrawlyRenderServer, [base_url: <url>]}"
           )
 
-          raise RuntimeError
+          raise "CrawlyRenderServer fetcher requires a :base_url option"
 
-        base_url ->
-          base_url
+        url ->
+          url
       end
 
+    # 1. Use built-in JSON to encode the request body
     req_body =
-      Poison.encode!(%{
+      JSON.encode!(%{
         url: request.url,
         headers: Map.new(request.headers)
       })
 
-    case HTTPoison.post(
+    # 2. Use Req to make the POST request.
+    # We pass the request.options directly to Req, which will use any
+    # compatible options (like timeouts).
+    case Req.post(
            base_url,
-           req_body,
-           [{"content-type", "application/json"}],
-           request.options
+           [body: req_body, headers: %{"content-type" => "application/json"}] ++
+             request.options
          ) do
       {:ok, response} ->
-        js = Poison.decode!(response.body)
+        # 3. Use a `with` statement for safer decoding and map access
+        with {:ok, js_map} <- JSON.decode(response.body),
+             %{"page" => page, "status" => status, "headers" => headers} <-
+               js_map do
+          # 4. Construct a plain map for the response, which is more idiomatic
+          #    and decouples us from any specific HTTP client's response struct.
+          #    Crawly's fetcher behavior just needs a struct/map with these keys.
+          new_response = %{
+            body: page,
+            status_code: status,
+            headers: headers,
+            request_url: request.url,
+            request: request
+          }
 
-        new_response = %HTTPoison.Response{
-          body: Map.get(js, "page"),
-          status_code: Map.get(js, "status"),
-          headers: Map.get(js, "headers"),
-          request_url: request.url,
-          request: request
-        }
+          {:ok, new_response}
+        else
+          # Handle cases where JSON decoding fails or keys are missing
+          _error ->
+            {:error,
+             %{
+               reason: "invalid_response_from_render_server",
+               body: response.body
+             }}
+        end
 
-        {:ok, new_response}
-
-      err ->
+      # Pass through any request-level errors (e.g., connection refused)
+      {:error, _reason} = err ->
         err
     end
   end

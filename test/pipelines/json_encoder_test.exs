@@ -8,11 +8,11 @@ defmodule Pipelines.JSONEncoderTest do
     item = @valid
     state = %{spider_name: Test, crawl_id: "test"}
 
-    {item, _state} = Crawly.Utils.pipe(pipelines, item, state)
+    {json_string, _state} = Crawly.Utils.pipe(pipelines, item, state)
 
-    assert is_binary(item)
-    assert item =~ @valid.data |> hd() |> Map.get(:some)
-    assert item =~ "data"
-    assert item =~ "some"
+    assert is_binary(json_string)
+    assert json_string =~ @valid.data |> hd() |> Map.get(:some)
+    assert json_string =~ "data"
+    assert json_string =~ "some"
   end
 end
