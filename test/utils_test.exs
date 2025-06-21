@@ -1,7 +1,10 @@
 defmodule UtilsTest do
   use ExUnit.Case, async: false
+  require Req
 
   setup do
+    :meck.new(Req)
+
     on_exit(fn ->
       System.delete_env("SPIDERS_DIR")
       :ok = Crawly.Utils.clear_registered_spiders()
@@ -251,13 +254,13 @@ defmodule UtilsTest do
 
     [result] = Crawly.Utils.preview(yml)
     # 6. Assert against the new error struct's string representation
-    assert result.error =~ "%Req.Response{reason: :nxdomain}"
+    assert result.error =~ "%Req.TransportError{reason: :nxdomain}"
   end
 
   test "can extract data from given page" do
-    html = """
+    wtf = """
     <h1> My product </h1>
-    <a href="/next"></a>
+    <a href="/catalogue/page-2.html"></a>
     """
 
     yml = """
@@ -277,13 +280,15 @@ defmodule UtilsTest do
       Req,
       :get,
       fn _url, _opts ->
-        # The original test was already using a Req.Response struct, which is great!
-        # We just need to ensure the mock is on the correct module.
-        {:ok, %Req.Response{body: html, status: 200}}
+        IO.puts("Mocking Req.get/2")
+        {:ok, %Req.Response{body: wtf, status: 200}}
       end
     )
 
     [result] = Crawly.Utils.preview(yml)
+
+    IO.puts("Result: #{inspect(result)}")
+
     assert result.items == [%{"title" => "All products"}]
     assert result.requests == ["https://books.toscrape.com/next"]
     assert result.url == "https://books.toscrape.com/"

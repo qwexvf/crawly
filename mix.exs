@@ -47,11 +47,11 @@ defmodule Crawly.Mixfile do
     [
       {:elixir_uuid, "~> 1.2"},
       {:gollum, "~> 0.5.0", hex: :new_gollum},
-      {:plug_cowboy, "~> 2.0"},
+      {:plug_cowboy, "~> 2.7"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:earmark, "1.5.0-pre1", override: true},
-      {:meck, "~> 0.9", only: :test},
+      {:meck, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.14.6", only: :test},
       {:yaml_elixir, "~> 2.11"},
       {:ex_json_schema, "~> 0.11.1"},

@@ -88,8 +88,8 @@ defmodule Crawly.Worker do
         err
 
       # 3. Pattern match on the standardized map with :status_code
-      {:ok, %{status_code: code} = response} ->
-        case code in retry_codes do
+      {:ok, response} ->
+        case response.status in retry_codes do
           true ->
             :ok = maybe_retry_request(spider_name, request)
             {:error, :retry}
@@ -130,6 +130,8 @@ defmodule Crawly.Worker do
     do: spider_name.parse_item(response)
 
   defp do_parse(parsers, spider_name, response) when is_list(parsers) do
+    IO.puts("Running parsers: #{inspect(parsers)}")
+
     # 5. Accessing response.request_url now works because our standardized map has it
     case Crawly.Utils.pipe(parsers, %{}, %{
            spider_name: spider_name,

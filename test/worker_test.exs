@@ -105,7 +105,7 @@ defmodule WorkerTest do
           # 2. Return the standardized map that the worker expects
           {:ok,
            %{
-             status_code: 404,
+             status: 404,
              body: "",
              headers: [],
              request: request,
@@ -168,7 +168,7 @@ defmodule WorkerTest do
         fn request, _options ->
           {:ok,
            %{
-             status_code: 200,
+             status: 200,
              body: "Some page",
              headers: [],
              request: request,
@@ -188,7 +188,7 @@ defmodule WorkerTest do
         fn request, _options ->
           {:ok,
            %{
-             status_code: 500,
+             status: 500,
              body: "Some page",
              headers: [],
              request: request,
@@ -241,7 +241,7 @@ defmodule WorkerTest do
         fn request, _options ->
           {:ok,
            %{
-             status_code: 200,
+             status: 200,
              body: "Some page",
              headers: [],
              request: request,
