@@ -3,8 +3,6 @@ defmodule UtilsTest do
   require Req
 
   setup do
-    :meck.new(Req)
-
     on_exit(fn ->
       System.delete_env("SPIDERS_DIR")
       :ok = Crawly.Utils.clear_registered_spiders()
@@ -246,8 +244,7 @@ defmodule UtilsTest do
     :meck.expect(
       Req,
       :get,
-      fn _url, _opts ->
-        # 5. Return a Req error struct
+      fn _url ->
         {:error, %Req.TransportError{reason: :nxdomain}}
       end
     )
@@ -260,7 +257,7 @@ defmodule UtilsTest do
   test "can extract data from given page" do
     wtf = """
     <h1> My product </h1>
-    <a href="/catalogue/page-2.html"></a>
+    <a href="/next"></a>
     """
 
     yml = """
@@ -279,17 +276,14 @@ defmodule UtilsTest do
     :meck.expect(
       Req,
       :get,
-      fn _url, _opts ->
-        IO.puts("Mocking Req.get/2")
+      fn _url ->
         {:ok, %Req.Response{body: wtf, status: 200}}
       end
     )
 
     [result] = Crawly.Utils.preview(yml)
 
-    IO.puts("Result: #{inspect(result)}")
-
-    assert result.items == [%{"title" => "All products"}]
+    assert result.items == [%{"title" => " My product "}]
     assert result.requests == ["https://books.toscrape.com/next"]
     assert result.url == "https://books.toscrape.com/"
   end

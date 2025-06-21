@@ -14,13 +14,13 @@ defmodule Crawly.Fetchers.CrawlyRenderServerTest do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
         # 1. The refactored code now raises a string, not a RuntimeError struct.
-        assert_raise "CrawlyRenderServer fetcher requires a :base_url option",
+        assert_raise RuntimeError,
+                     "CrawlyRenderServer fetcher requires a :base_url option",
                      fn ->
                        CrawlyRenderServer.fetch(request, client_options)
                      end
       end)
 
-    # 2. Assert against the new log message.
     assert log =~
              "The :base_url is not set. CrawlyRenderServer can't be used! Please set :base_url"
   end

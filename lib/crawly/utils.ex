@@ -61,8 +61,6 @@ defmodule Crawly.Utils do
           {module, nil}
       end
 
-    IO.puts("Running pipeline: #{inspect(module)}, with args: #{inspect(args)}")
-
     {new_item, new_state} =
       try do
         case args do
@@ -87,7 +85,6 @@ defmodule Crawly.Utils do
           {item, state}
       end
 
-    IO.puts("Pipeline result: #{inspect(new_item)}")
     pipe(pipelines, new_item, new_state)
   end
 
