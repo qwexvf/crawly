@@ -1,7 +1,8 @@
-name: Elixir GitHub Actions
+name: Elixir CI
 
 on:
   push:
+    # It's common to use 'main' now, but 'master' works just as well.
     branches:
       - master
   pull_request:
@@ -9,30 +10,54 @@ on:
       - '*'
 
 jobs:
-  build:
+  build_and_test:
+    name: Build and Test on OTP ${{ matrix.otp }} / Elixir ${{ matrix.elixir }}
     runs-on: ubuntu-latest
+
+    # Use a matrix to test against different Elixir/OTP versions
+    strategy:
+      matrix:
+        otp: ['26.2', '27.0'] # Test against latest OTP 26 and 27
+        elixir: ['1.16.3', '1.17.2'] # Test against latest Elixir 1.16 and 1.17
+        exclude:
+          # Exclude combinations that are not compatible
+          - otp: '26.2'
+            elixir: '1.17.2'
+          - otp: '27.0'
+            elixir: '1.16.3'
 
     env:
       MIX_ENV: test
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        # Updated to the latest major version for security and features
+        uses: actions/checkout@v4
 
-
-      - name: Setup Elixir
+      - name: Setup Elixir and OTP
         uses: erlef/setup-beam@v1
         with:
-            otp-version: "24.2.1"
-            elixir-version: "1.14.0"
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+          # This enables caching of deps and _build directories for faster runs
+          cache-deps: true
 
-      - run: mix deps.get
-      - run: mix compile --all-warnings --warnings-as-errors
-      - run: mix format --check-formatted
+      - name: Install Dependencies
+        run: mix deps.get
 
-      - name: Tests & Coverage
+      - name: Check Code Formatting
+        run: mix format --check-formatted
+
+      - name: Compile with --warnings-as-errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run Tests with Coverage and Post Feedback
+        # This action runs the tests and posts coverage feedback to the PR
         uses: josecfreittas/elixir-coverage-feedback-action@v1
         with:
+          # The GITHUB_TOKEN is required for the action to post comments
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Set a minimum coverage threshold
           coverage_threshold: 75
+          # Explicitly define the test command for clarity
+          test_command: mix test --cover
